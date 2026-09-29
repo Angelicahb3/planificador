@@ -84,7 +84,8 @@ td select:focus{border-color:var(--sage);background:#fff;}
 .btn-outline.active{background:var(--sage);color:#fff;border-color:var(--sage);}
 .badge-fijo{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;background:var(--sage);color:#fff;font-size:9px;font-weight:800;letter-spacing:0;flex-shrink:0;cursor:default;}
 .btn-sm{padding:5px 11px;font-size:11px;border-radius:7px;}
-.expenses-wrap{background:var(--bg-card);border-radius:14px;padding:20px;box-shadow:var(--shadow);}
+.expenses-wrap{background:var(--bg-card);border-radius:14px;padding:20px;box-shadow:var(--shadow);overflow:hidden;}
+.expenses-wrap .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .expenses-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
 .exp-toggle{width:16px;height:16px;cursor:pointer;accent-color:var(--sage);}
 tbody tr.inactive{opacity:.42;}
@@ -94,6 +95,8 @@ tbody tr.inactive td input,tbody tr.inactive td select{text-decoration:line-thro
 .cat-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;flex-shrink:0;vertical-align:middle;}
 .flujo-card{background:var(--bg-card);border-radius:14px;padding:20px;box-shadow:var(--shadow);border-top:4px solid var(--green);}
 .flujo-card.negative{border-top-color:var(--red);}
+@media(max-width:600px){.flujo-card [style*="repeat(3,1fr)"]{grid-template-columns:1fr!important;}}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .progress-bar-bg{height:7px;border-radius:4px;background:var(--border);overflow:hidden;margin-top:16px;}
 .progress-bar-fill{height:100%;border-radius:4px;background:var(--sage);transition:width .4s ease;}
 .progress-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-top:5px;}
@@ -148,7 +151,8 @@ input.standalone:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(122,96
 .month-nav-btn{background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--forest);transition:all .15s;font-family:'Inter',sans-serif;}
 .month-nav-btn:hover{background:var(--sage);color:#fff;border-color:var(--sage);}
 .month-label{font-size:15px;font-weight:800;color:var(--forest);min-width:170px;text-align:center;text-transform:capitalize;}
-.comparison-wrap{background:var(--bg-card);border-radius:14px;padding:20px;box-shadow:var(--shadow);margin-top:18px;}
+.comparison-wrap{background:var(--bg-card);border-radius:14px;padding:20px;box-shadow:var(--shadow);margin-top:18px;overflow:hidden;}
+.comparison-wrap .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 /* Print */
 @media print{
   body>*{display:none!important;}
@@ -344,7 +348,8 @@ input.standalone:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(122,96
         <button class="btn btn-primary btn-sm" onclick="addExpense()">＋ Agregar gasto</button>
       </div>
     </div>
-    <table>
+    <div class="table-scroll">
+    <table style="min-width:560px;">
       <thead><tr>
         <th style="width:4%;text-align:center;">Activo</th>
         <th style="width:28%">Concepto</th>
@@ -363,6 +368,7 @@ input.standalone:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(122,96
         <td></td>
       </tr></tfoot>
     </table>
+    </div>
   </div>
 
   <!-- ANÁLISIS VISUAL -->
@@ -397,10 +403,10 @@ input.standalone:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(122,96
   <!-- FLUJO -->
   <div class="section-title">Resumen de Flujo</div>
   <div class="flujo-card" id="flujo-card-wrap" style="margin-bottom:18px;">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">
-      <div><div class="kpi-label" style="margin-bottom:6px;">Ingresos totales</div><div style="font-size:22px;font-weight:800;color:var(--green);font-variant-numeric:tabular-nums;" id="flujo-ing">$0</div></div>
-      <div><div class="kpi-label" style="margin-bottom:6px;">Gastos totales</div><div style="font-size:22px;font-weight:800;color:var(--red);font-variant-numeric:tabular-nums;" id="flujo-gas">$0</div></div>
-      <div><div class="kpi-label" style="margin-bottom:6px;">Flujo libre</div><div style="font-size:32px;font-weight:800;font-variant-numeric:tabular-nums;" id="flujo-libre-big">$0</div></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+      <div style="background:var(--bg-alt);border-radius:10px;padding:14px 16px;"><div class="kpi-label" style="margin-bottom:6px;">Ingresos totales</div><div style="font-size:22px;font-weight:800;color:var(--green);font-variant-numeric:tabular-nums;" id="flujo-ing">$0</div></div>
+      <div style="background:var(--bg-alt);border-radius:10px;padding:14px 16px;"><div class="kpi-label" style="margin-bottom:6px;">Gastos totales</div><div style="font-size:22px;font-weight:800;color:var(--red);font-variant-numeric:tabular-nums;" id="flujo-gas">$0</div></div>
+      <div style="background:var(--bg-alt);border-radius:10px;padding:14px 16px;"><div class="kpi-label" style="margin-bottom:6px;">Flujo libre</div><div style="font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;" id="flujo-libre-big">$0</div></div>
     </div>
     <div class="progress-bar-bg"><div class="progress-bar-fill" id="flujo-bar" style="width:0%;"></div></div>
     <div class="progress-labels"><span id="flujo-bar-l">Gastos: 0%</span><span id="flujo-bar-r">Flujo libre: 0%</span></div>
@@ -524,7 +530,8 @@ input.standalone:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(122,96
   <div class="section-title" style="margin-top:20px;">Gastos del Mes</div>
   <p class="section-note" style="margin-top:-8px;"><span class="badge-fijo" style="vertical-align:middle;">P</span> Fijo – cargado automáticamente · <span class="badge-var" style="vertical-align:middle;">V</span> Variable – acumula registros · Haz clic en una categoría o concepto para ver el detalle.</p>
   <div class="expenses-wrap">
-    <table>
+    <div class="table-scroll">
+    <table style="min-width:480px;">
       <thead><tr>
         <th style="width:38%">Concepto / Categoría</th>
         <th style="width:16%">Pagador</th>
@@ -539,6 +546,7 @@ input.standalone:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(122,96
         <td></td>
       </tr></tfoot>
     </table>
+    </div>
   </div>
 
   <!-- INGRESOS DEL MES -->
@@ -576,7 +584,8 @@ input.standalone:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(122,96
   <!-- CONCENTRADO POR CATEGORÍA -->
   <div class="comparison-wrap">
     <div style="font-size:13px;font-weight:700;color:var(--forest);margin-bottom:14px;">Presupuesto vs Real por Categoría</div>
-    <table>
+    <div class="table-scroll">
+    <table style="min-width:380px;">
       <thead><tr>
         <th style="width:34%">Categoría</th>
         <th style="width:22%;text-align:right;">Presupuesto</th>
@@ -591,6 +600,7 @@ input.standalone:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(122,96
         <td style="text-align:right;" id="comp-tot-d">$0</td>
       </tr></tfoot>
     </table>
+    </div>
   </div>
 
 </div><!-- /tab-gasto-real -->
