@@ -1,0 +1,2 @@
+# planificador
+Planificador de finanzas
