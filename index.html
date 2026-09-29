@@ -239,6 +239,7 @@ input.standalone:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(122,96
 <script src="https://cdn.jsdelivr.net/npm/firebase@8.10.1/firebase-app.js" onerror="window._fbErr=true"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@8.10.1/firebase-firestore.js" onerror="window._fbErr=true"></script>
 <!-- firebase-auth no necesario: se usa PIN local -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -345,6 +346,9 @@ input.standalone:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(122,96
       <div style="font-size:13px;font-weight:600;color:var(--forest);">Lista de gastos</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-outline btn-sm" id="sort-btn" onclick="toggleSort()">Ordenar por categoría</button>
+        <button class="btn btn-outline btn-sm" onclick="downloadExpenseTemplate()" title="Descargar plantilla Excel con el formato correcto">⬇ Plantilla Excel</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('excel-import').click()" title="Importar gastos desde archivo Excel">📂 Importar Excel</button>
+        <input type="file" id="excel-import" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExpenseExcel(event)">
         <button class="btn btn-primary btn-sm" onclick="addExpense()">＋ Agregar gasto</button>
       </div>
     </div>
@@ -784,6 +788,82 @@ function renderIncomes(p){
     <td style="text-align:center;"><button class="delete-btn" onclick="removeIncome('${p}',${inc.id})">×</button></td>`;
     tb.appendChild(tr);
   });
+}
+
+// ── IMPORTAR / EXPORTAR EXCEL ─────────────────────────────────────────────
+function downloadExpenseTemplate(){
+  if(!window.XLSX){alert('La librería de Excel aún no está lista. Intente en un momento.');return;}
+  const cats=CATS.map(c=>c.key).join(' | ');
+  const ws=XLSX.utils.aoa_to_sheet([
+    ['Concepto','Tipo','Categoría','Monto mensual'],
+    ['Renta','Fijo','Servicios del Hogar',8500],
+    ['Electricidad (CFE)','Fijo','Servicios del Hogar',600],
+    ['Supermercado','Variable','Alimentos y Despensa',4000],
+    ['Netflix','Fijo','Entretenimiento',219],
+    ['Gimnasio','Fijo','Fitness y Bienestar',599],
+    ['Crédito auto','Fijo','Deuda / Crédito',3200],
+  ]);
+  // Estilos de ancho de columna
+  ws['!cols']=[{wch:32},{wch:12},{wch:26},{wch:16}];
+  // Nota de categorías válidas en fila 9
+  XLSX.utils.sheet_add_aoa(ws,[
+    [''],
+    ['Categorías válidas: '+cats],
+    ['Tipos válidos: Fijo | Variable'],
+  ],{origin:'A8'});
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Gastos');
+  XLSX.writeFile(wb,'plantilla_gastos.xlsx');
+}
+
+function importExpenseExcel(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  e.target.value='';
+  if(!window.XLSX){alert('La librería de Excel no está disponible.');return;}
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      const imported=[];
+      for(let i=1;i<rows.length;i++){
+        const r=rows[i];
+        const concepto=(r[0]||'').toString().trim();
+        if(!concepto||concepto.startsWith('Categorías válidas'))continue;
+        const tipoRaw=(r[1]||'Fijo').toString().trim().toLowerCase();
+        const tipo=tipoRaw==='variable'?'Variable':'Fijo';
+        const catRaw=(r[2]||'').toString().trim();
+        // Buscar categoría exacta o parcial, fallback a 'Otros'
+        const catMatch=CATS.find(c=>c.key.toLowerCase()===catRaw.toLowerCase())
+          ||CATS.find(c=>c.key.toLowerCase().includes(catRaw.toLowerCase()));
+        const cat=catMatch?catMatch.key:'Otros';
+        const montoRaw=(r[3]||'0').toString().replace(/[$,\s]/g,'');
+        const monto=parseFloat(montoRaw)||0;
+        imported.push({id:nExp++,concepto,cat,tipo,monto,active:true});
+      }
+      if(!imported.length){
+        alert('No se encontraron filas con datos válidos.\n\nVerifique que la primera fila sea encabezado y que la columna A (Concepto) tenga texto.');
+        return;
+      }
+      const replace=confirm(
+        'Se encontraron '+imported.length+' gasto(s) en el archivo.\n\n'+
+        '¿Desea REEMPLAZAR la lista actual o AGREGAR a los existentes?\n\n'+
+        'Aceptar = Reemplazar todo\nCancelar = Agregar al final'
+      );
+      if(replace){state.expenses=imported;}
+      else{state.expenses=[...state.expenses,...imported];}
+      renderExpenses();recalc();saveState();
+      // Feedback visual en el badge de guardado
+      const el=document.getElementById('lastSaved');
+      if(el){const prev=el.textContent;el.textContent=(replace?'Reemplazados':'Agregados')+' '+imported.length+' gastos';setTimeout(()=>{el.textContent=prev;},2500);}
+    }catch(err){
+      alert('Error al leer el archivo.\nAsegúrese de que sea un Excel válido (.xlsx).\n\nDetalle: '+err.message);
+      console.error('importExpenseExcel error:',err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 // ── BUDGET EXPENSES (Tab 1) ─────────────────────────────────────────────────
