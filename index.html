@@ -1653,14 +1653,28 @@ function signIn(){
   document.getElementById('auth-error').textContent='';
   document.getElementById('auth-spinner').style.display='block';
   document.getElementById('google-signin-btn').disabled=true;
+  document.getElementById('google-signin-btn').textContent='Redirigiendo a Google…';
   const provider=new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider).catch(err=>{
+  auth.signInWithRedirect(provider).catch(err=>{
     document.getElementById('auth-spinner').style.display='none';
     document.getElementById('google-signin-btn').disabled=false;
+    document.getElementById('google-signin-btn').textContent='Iniciar sesión con Google';
     document.getElementById('auth-error').textContent='Error al iniciar sesión. Intenta de nuevo.';
   });
 }
 function signOut(){auth.signOut();}
+
+// Capturar resultado del redirect al volver de Google
+auth.getRedirectResult().catch(err=>{
+  if(err&&err.code){
+    const eEl=document.getElementById('auth-error');
+    if(eEl)eEl.textContent='Error ('+err.code+'). Intenta de nuevo.';
+    const sp=document.getElementById('auth-spinner');
+    if(sp)sp.style.display='none';
+    const btn=document.getElementById('google-signin-btn');
+    if(btn){btn.disabled=false;}
+  }
+});
 
 auth.onAuthStateChanged(user=>{
   if(user){
