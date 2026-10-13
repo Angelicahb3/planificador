@@ -248,7 +248,7 @@ input.standalone:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(122,96
   <div class="auth-card">
     <div class="auth-lock">🔒</div>
     <h2>Planificador Familiar</h2>
-    <p class="auth-sub">Angélica &amp; Jorge · Comex CARE</p>
+    <p class="auth-sub">Angélica &amp; Jorge</p>
     <input id="pin-input" type="password" maxlength="10" placeholder="••••"
       autocomplete="current-password"
       onkeydown="if(event.key==='Enter')checkPin()">
@@ -615,16 +615,20 @@ input.standalone:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(122,96
 <script>
 // ── CATEGORIES ──────────────────────────────────────────────────────────────
 const CATS=[
-  {key:'Servicios del Hogar', color:'#52886F'},
-  {key:'Alonso',              color:'#243B2E'},
-  {key:'Entretenimiento',     color:'#F5922A'},
-  {key:'Fitness y Bienestar', color:'#C47A20'},
-  {key:'Salud y Belleza',     color:'#9B6B9B'},
-  {key:'Alimentos y Despensa',color:'#5B8C5A'},
-  {key:'Deuda / Crédito',     color:'#B83C2B'},
-  {key:'Mascotas',            color:'#7B9E6B'},
-  {key:'Herramientas de Trabajo', color:'#4A7AA0'},
-  {key:'Otros',               color:'#A09080'},
+  {key:'Servicios del Hogar',        color:'#52886F'},
+  {key:'Alonso',                     color:'#243B2E'},
+  {key:'Entretenimiento',            color:'#F5922A'},
+  {key:'Gastos Personales Jorge',    color:'#2E7DAA'},
+  {key:'Gastos Personales Angélica', color:'#8B5E9B'},
+  {key:'Fitness y Bienestar',        color:'#C47A20'},
+  {key:'Salud',                      color:'#2A7A5A'},
+  {key:'Belleza y Cuidado Personal', color:'#C4607A'},
+  {key:'Seguros',                    color:'#4A6AA0'},
+  {key:'Alimentos y Despensa',       color:'#5B8C5A'},
+  {key:'Deuda / Crédito',            color:'#B83C2B'},
+  {key:'Mascotas',                   color:'#7B9E6B'},
+  {key:'Herramientas de Trabajo',    color:'#4A7AA0'},
+  {key:'Otros',                      color:'#A09080'},
 ];
 const CAT_MAP=Object.fromEntries(CATS.map(c=>[c.key,c.color]));
 function catColor(k){return CAT_MAP[k]||'#A09080';}
@@ -653,7 +657,10 @@ function monthLabel(k){const[y,m]=k.split('-');return MES[+m-1]+' '+y;}
 
 function migrateExpenses(arr){
   return (arr||[]).map(e=>{
-    if(!CATS.find(c=>c.key===e.cat)){e.cat=(e.cat==='Deuda'?'Deuda / Crédito':'Otros');}
+    // Migración de categorías renombradas
+    if(e.cat==='Deuda')e.cat='Deuda / Crédito';
+    if(e.cat==='Salud y Belleza')e.cat='Salud'; // separada en Salud + Belleza y Cuidado Personal
+    if(!CATS.find(c=>c.key===e.cat))e.cat='Otros';
     if(e.active===undefined)e.active=true;
     if(e.tipo===undefined)e.tipo='Fijo';
     return e;
@@ -1340,9 +1347,13 @@ function exportPDF(){
 
   const prev=document.title;
   document.title='Gasto Real '+mes;
+  const cleanup=()=>{
+    el('print-area').innerHTML='';
+    document.title=prev;
+    window.removeEventListener('afterprint',cleanup);
+  };
+  window.addEventListener('afterprint',cleanup);
   window.print();
-  document.title=prev;
-  el('print-area').innerHTML='';
 }
 
 // ── TAB 3: CAPTURA RÁPIDA ───────────────────────────────────────────────────
