@@ -1542,8 +1542,10 @@ function renderCaptureList(){
       subsByParent[g.parentSrcId].push(g);
     });
 
-    // Ad-hoc captures (no srcId, no parentSrcId)
-    const adHocEntries=catEntries.filter(g=>!g.srcId&&!g.parentSrcId);
+    // Ad-hoc captures (no srcId, no parentSrcId) — also includes orphan sub-captures
+    // (parentSrcId that no longer points to an active Variable expense)
+    const activeVarIds=new Set(varConcepts.map(e=>e.id));
+    const adHocEntries=catEntries.filter(g=>!g.srcId&&(!g.parentSrcId||!activeVarIds.has(g.parentSrcId)));
 
     const catTotal=
       fijoEntries.reduce((s,g)=>s+(g.monto||0),0)+
