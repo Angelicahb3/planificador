@@ -655,16 +655,44 @@ const MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','se
 function monthKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
 function monthLabel(k){const[y,m]=k.split('-');return MES[+m-1]+' '+y;}
 
+// Mapa de renombres de categorías (clave vieja → clave nueva)
+const CAT_RENAMES={
+  'Deuda':                    'Deuda / Crédito',
+  'Salud y Belleza':          'Salud',
+  'Entretenimiento Jorge':    'Gastos Personales Jorge',
+  'Entretenimiento Angélica': 'Gastos Personales Angélica',
+  'Entretenimiento Angelica': 'Gastos Personales Angélica',
+  'Gasto Personal Jorge':     'Gastos Personales Jorge',
+  'Gasto Personal Angélica':  'Gastos Personales Angélica',
+  'Gasto Personal Angelica':  'Gastos Personales Angélica',
+  'Belleza':                  'Belleza y Cuidado Personal',
+  'Belleza y Salud':          'Belleza y Cuidado Personal',
+  'Seguro':                   'Seguros',
+  'Fitness':                  'Fitness y Bienestar',
+  'Alimentos':                'Alimentos y Despensa',
+  'Despensa':                 'Alimentos y Despensa',
+};
+function migrateOneCat(cat){
+  if(CAT_RENAMES[cat])return CAT_RENAMES[cat];
+  if(!CATS.find(c=>c.key===cat))return 'Otros';
+  return cat;
+}
 function migrateExpenses(arr){
   return (arr||[]).map(e=>{
-    // Migración de categorías renombradas
-    if(e.cat==='Deuda')e.cat='Deuda / Crédito';
-    if(e.cat==='Salud y Belleza')e.cat='Salud'; // separada en Salud + Belleza y Cuidado Personal
-    if(!CATS.find(c=>c.key===e.cat))e.cat='Otros';
+    e.cat=migrateOneCat(e.cat);
     if(e.active===undefined)e.active=true;
     if(e.tipo===undefined)e.tipo='Fijo';
     return e;
   });
+}
+// Migra categorías en TODOS los registros de gastoReal
+function migrateGastoReal(gr){
+  if(!gr||!gr.meses)return gr;
+  Object.values(gr.meses).forEach(m=>{
+    const gastos=Array.isArray(m)?m:(m.gastos||[]);
+    gastos.forEach(g=>{if(g.cat)g.cat=migrateOneCat(g.cat);});
+  });
+  return gr;
 }
 
 // Returns month object {ang_real:[],jor_real:[],gastos:[]} — migrates if needed
@@ -724,6 +752,7 @@ function syncFixedToReal(mk){
 function applyRemoteState(s){
   if(!s)return;
   s.expenses=migrateExpenses(s.expenses||[]);
+  if(s.gastoReal)migrateGastoReal(s.gastoReal);
   state={...state,...s};
   if(!state.gastoReal)state.gastoReal={viewingMonth:monthKey(new Date()),meses:{}};
   if(!state.gastoReal.meses)state.gastoReal.meses={};
@@ -1683,6 +1712,40 @@ function renderCaptureList(){
       tb.appendChild(tr);
     });
   });
+
+  // ── Grupo de rescate: entradas con categoría no reconocida ──
+  const knownCatKeys=new Set(CATS.map(c=>c.key));
+  const orphanEntries=entries.filter(g=>!knownCatKeys.has(g.cat));
+  if(orphanEntries.length){
+    const orphanTotal=orphanEntries.reduce((s,g)=>s+(g.monto||0),0);
+    grandTotal+=orphanTotal;
+    const isOpen=expandedCats.has('__orphan__');
+    const headerTr=document.createElement('tr');
+    headerTr.className='cap-group-header';
+    headerTr.onclick=()=>toggleCatGroup('__orphan__');
+    headerTr.style.background='#FCEAF2';
+    headerTr.innerHTML=`<td colspan="3"><div style="display:flex;align-items:center;gap:7px;">
+      <span class="cap-chevron${isOpen?' open':''}">▶</span>
+      <span style="font-size:12px;font-weight:800;color:#D03568;">⚠ Categoría no reconocida</span>
+      <span style="font-size:11px;color:#D03568;">(${orphanEntries.length} registro${orphanEntries.length!==1?'s':''})</span>
+      <span style="font-size:10px;color:#D03568;margin-left:4px;">— reasigne la categoría en cada fila</span>
+    </div></td>
+    <td style="text-align:right;font-weight:800;font-size:14px;color:#D03568;">${fmt(orphanTotal)}</td>
+    <td></td>`;
+    tb.appendChild(headerTr);
+    if(isOpen){
+      orphanEntries.forEach(g=>{
+        const tr=document.createElement('tr');
+        tr.style.background='#FFF0F5';
+        tr.innerHTML=`<td style="padding-left:32px;font-size:12px;color:#D03568;">${g.concepto||'—'}</td>
+        <td style="font-size:11px;color:#888;">${g.cat||'sin cat'}</td>
+        <td><select onchange="updateRealExpense(${g.id},'cat',this.value)" style="font-size:11px;padding:2px 4px;border:1px solid #D03568;border-radius:4px;color:#D03568;">${catOptions(g.cat)}</select></td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:#D03568;">${fmt(g.monto||0)}</td>
+        <td style="text-align:center;"><button class="delete-btn" onclick="removeRealExpense(${g.id})">×</button></td>`;
+        tb.appendChild(tr);
+      });
+    }
+  }
 
   set('cap-total-cell',fmt(grandTotal));
 }
