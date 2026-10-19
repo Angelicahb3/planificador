@@ -278,6 +278,20 @@ input.standalone:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(122,96
 .admin-input{width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;font-family:'Inter',sans-serif;color:var(--text);background:var(--bg-card);outline:none;transition:border-color .2s;}
 .admin-input:focus{border-color:var(--sage);}
 .admin-day-hint{font-size:10px;color:var(--text2);margin-top:2px;}
+/* Add-card form */
+.add-card-form{background:var(--bg-alt);border-radius:12px;padding:16px;border:1.5px dashed var(--border);margin-bottom:18px;}
+.add-card-form-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text2);margin-bottom:12px;}
+.add-card-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+@media(max-width:540px){.add-card-fields{grid-template-columns:1fr;}}
+.add-card-type-toggle{display:flex;gap:6px;margin-top:6px;}
+.add-card-type-btn{flex:1;padding:8px 6px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg-card);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;color:var(--text2);cursor:pointer;transition:all .2s;text-align:center;}
+.add-card-type-btn.active{background:var(--sage);border-color:var(--sage);color:#fff;}
+.add-card-actions{margin-top:12px;display:flex;justify-content:flex-end;}
+.custom-cards-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
+.custom-card-row{display:flex;align-items:center;gap:10px;background:var(--bg-card);border-radius:9px;padding:10px 14px;box-shadow:var(--shadow);border-left:3px solid var(--sage);}
+.custom-card-row.debito{border-left-color:var(--forest2);}
+.custom-card-name{flex:1;font-size:13px;font-weight:700;color:var(--forest);}
+.custom-card-meta{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:6px;}
 </style>
 
 <!-- Firebase v8 compat SDKs (via jsDelivr) -->
@@ -693,12 +707,47 @@ input.standalone:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(122,96
 
 <!-- ════════════════════ TAB 3: ADMINISTRADOR ════════════════════ -->
 <div id="tab-admin" class="tab-panel">
-  <div style="margin-top:0;">
-    <div class="section-title" style="margin-top:0;">Administrador</div>
-    <p class="section-note" style="margin-top:4px;">Configura las fechas de corte y límite de pago de cada tarjeta de crédito.</p>
+
+  <!-- Agregar tarjeta -->
+  <div class="section-title" style="margin-top:0;">Mis tarjetas y créditos</div>
+  <p class="section-note" style="margin-top:-8px;margin-bottom:14px;">Agrega tarjetas adicionales o créditos digitales. Las predeterminadas no se pueden eliminar.</p>
+
+  <div class="add-card-form" id="add-card-form">
+    <div class="add-card-form-title">➕ Agregar nueva tarjeta / crédito</div>
+    <div class="add-card-fields">
+      <div>
+        <div class="admin-lbl">Titular</div>
+        <select id="new-card-pg" class="admin-input">
+          <option value="ang">Angélica</option>
+          <option value="jor">Jorge</option>
+        </select>
+      </div>
+      <div>
+        <div class="admin-lbl">Nombre de la tarjeta</div>
+        <input type="text" id="new-card-nombre" class="admin-input" placeholder="ej. BBVA Azul, Clip, etc."
+          onkeydown="if(event.key==='Enter')addCustomTarjeta()">
+      </div>
+    </div>
+    <div class="admin-lbl" style="margin-top:10px;">Tipo</div>
+    <div class="add-card-type-toggle" id="new-card-type-toggle">
+      <button class="add-card-type-btn active" id="nctt-credito" onclick="setNewCardType('credito')">💳 Crédito</button>
+      <button class="add-card-type-btn" id="nctt-debito" onclick="setNewCardType('debito')">🏦 Débito</button>
+    </div>
+    <div class="add-card-actions">
+      <button class="btn btn-primary" onclick="addCustomTarjeta()">Agregar tarjeta</button>
+    </div>
   </div>
+
+  <!-- Lista tarjetas custom -->
+  <div id="admin-custom-cards-list" class="custom-cards-list"></div>
+
+  <!-- Fechas de corte (sólo crédito) -->
+  <div class="section-title">Fechas de corte y pago</div>
+  <p class="section-note" style="margin-top:-8px;">Solo aplica a tarjetas de crédito.</p>
   <div id="admin-tarjetas-grid" class="admin-grid"></div>
-  <div id="admin-msi-section" style="margin-top:8px;">
+
+  <!-- Historial MSI -->
+  <div id="admin-msi-section" style="margin-top:20px;">
     <div class="section-title">Compras a MSI activas</div>
     <p class="section-note" style="margin-top:-8px;">Historial de compras diferidas a meses sin intereses.</p>
     <div id="admin-msi-list"></div>
@@ -741,17 +790,31 @@ const CREDIT_CARDS={
   ang:new Set(['NU Crédito','Affinity','Simplicity','Liverpool Departamental','Liverpool Visa','Banamex Priority','Banamex']),
   jor:new Set(['NU Crédito','Klar Crédito','Bancomer','Santander'])
 };
-function isCreditCard(pagador,tarjeta){return !!(CREDIT_CARDS[pagador]&&CREDIT_CARDS[pagador].has(tarjeta));}
+function isCreditCard(pagador,tarjeta){
+  if(CREDIT_CARDS[pagador]&&CREDIT_CARDS[pagador].has(tarjeta))return true;
+  const custom=(state.tarjetasCustom&&state.tarjetasCustom[pagador])||[];
+  return custom.some(c=>c.nombre===tarjeta&&c.tipo==='credito');
+}
 function tarjetaKey(pagador,tarjeta){return pagador+'::'+tarjeta;}
+function allTarjetasList(pagador){
+  const base=TARJETAS[pagador]||[];
+  const custom=((state.tarjetasCustom&&state.tarjetasCustom[pagador])||[]).map(c=>c.nombre);
+  return [...base,...custom.filter(n=>!base.includes(n))];
+}
+function allCreditCardsList(pagador){
+  const base=[...(CREDIT_CARDS[pagador]||new Set())];
+  const custom=((state.tarjetasCustom&&state.tarjetasCustom[pagador])||[]).filter(c=>c.tipo==='credito').map(c=>c.nombre);
+  return [...base,...custom.filter(n=>!base.includes(n))];
+}
 function tarjetaOptions(pagador,sel){
-  const list=TARJETAS[pagador]||[];
+  const list=allTarjetasList(pagador);
   if(!list.length)return '<option value="">— sin tarjetas —</option>';
   return '<option value="">— tarjeta —</option>'+list.map(t=>`<option value="${t}"${t===sel?' selected':''}>${t}</option>`).join('');
 }
 
 // ── STATE ───────────────────────────────────────────────────────────────────
-let state={ang_incomes:[],jor_incomes:[],expenses:[],terreno:{mensualidad:0,nombre:'',plazo:0},gastoReal:{viewingMonth:monthKey(new Date()),meses:{}},tarjetasConfig:{},msiCompras:[]};
-let nInc=1,nExp=1,nReal=1,nRealInc=1,nMsi=1;
+let state={ang_incomes:[],jor_incomes:[],expenses:[],terreno:{mensualidad:0,nombre:'',plazo:0},gastoReal:{viewingMonth:monthKey(new Date()),meses:{}},tarjetasConfig:{},msiCompras:[],tarjetasCustom:{ang:[],jor:[]}};
+let nInc=1,nExp=1,nReal=1,nRealInc=1,nMsi=1,nTar=1;
 let expSortByCat=false;
 let realSortByCat=false;
 const MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -863,6 +926,11 @@ function applyRemoteState(s){
   if(!state.gastoReal.viewingMonth)state.gastoReal.viewingMonth=monthKey(new Date());
   if(!state.tarjetasConfig)state.tarjetasConfig={};
   if(!state.msiCompras)state.msiCompras=[];
+  if(!state.tarjetasCustom)state.tarjetasCustom={ang:[],jor:[]};
+  if(!state.tarjetasCustom.ang)state.tarjetasCustom.ang=[];
+  if(!state.tarjetasCustom.jor)state.tarjetasCustom.jor=[];
+  const allTarIds=[...(state.tarjetasCustom.ang||[]),...(state.tarjetasCustom.jor||[])].map(t=>t.id).filter(Boolean);
+  if(allTarIds.length)nTar=Math.max(...allTarIds)+1;
   const allI=[...(state.ang_incomes||[]),...(state.jor_incomes||[])];
   if(allI.length)nInc=Math.max(...allI.map(i=>i.id))+1;
   if(state.expenses.length)nExp=Math.max(...state.expenses.map(e=>e.id))+1;
@@ -2056,13 +2124,34 @@ function calcPaidInstallments(compra){
 
 // ── ADMIN TAB ─────────────────────────────────────────────────────────────────
 function renderAdminTab(){
-  // ── Tarjetas de crédito ──
+  // ── Lista tarjetas custom ──
+  const customList=document.getElementById('admin-custom-cards-list');
+  if(customList){
+    let html='';
+    ['ang','jor'].forEach(pg=>{
+      const pgLabel=pg==='ang'?'Angélica':'Jorge';
+      const custom=(state.tarjetasCustom&&state.tarjetasCustom[pg])||[];
+      custom.forEach(c=>{
+        const isCredit=c.tipo==='credito';
+        html+=`<div class="custom-card-row${isCredit?'':' debito'}">
+          <span class="custom-card-name">${isCredit?'💳':'🏦'} ${esc(c.nombre)}</span>
+          <span class="custom-card-meta">
+            <span class="admin-tc-badge${pg==='jor'?' jor':''}">${pgLabel}</span>
+            <span style="padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;background:${isCredit?'var(--sage-light)':'var(--bg-alt)'};color:${isCredit?'var(--forest)':'var(--text2)'};">${isCredit?'Crédito':'Débito'}</span>
+          </span>
+          <button class="delete-btn" title="Eliminar" onclick="if(confirm('¿Eliminar ${esc(c.nombre)}?'))deleteCustomTarjeta('${pg}',${c.id})">×</button>
+        </div>`;
+      });
+    });
+    customList.innerHTML=html||'<p style="color:var(--text2);font-size:12px;padding:4px 0 16px;font-style:italic;">Aún no has agregado tarjetas personalizadas.</p>';
+  }
+  // ── Tarjetas de crédito (config fechas) ──
   const grid=document.getElementById('admin-tarjetas-grid');
   if(grid){
     let html='';
     ['ang','jor'].forEach(pg=>{
       const pgLabel=pg==='ang'?'Angélica':'Jorge';
-      (CREDIT_CARDS[pg]||new Set()).forEach(t=>{
+      allCreditCardsList(pg).forEach(t=>{
         const k=tarjetaKey(pg,t);
         const cfg=state.tarjetasConfig[k]||{};
         html+=`<div class="admin-tc-card">
@@ -2076,7 +2165,7 @@ function renderAdminTab(){
               <input type="number" class="admin-input" min="1" max="31" placeholder="ej. 15"
                 value="${cfg.corte||''}"
                 onchange="updateTarjetaConfig('${k}','corte',this.value)">
-              <div class="admin-day-hint">Día del mes en que cierra tu estado de cuenta</div>
+              <div class="admin-day-hint">Día en que cierra tu estado de cuenta</div>
             </div>
             <div>
               <div class="admin-lbl">Límite de pago</div>
@@ -2122,6 +2211,44 @@ function renderAdminTab(){
 function updateTarjetaConfig(k,field,val){
   if(!state.tarjetasConfig[k])state.tarjetasConfig[k]={};
   state.tarjetasConfig[k][field]=parseInt(val)||null;
+  saveState();
+}
+let _newCardType='credito';
+function setNewCardType(tipo){
+  _newCardType=tipo;
+  document.getElementById('nctt-credito').classList.toggle('active',tipo==='credito');
+  document.getElementById('nctt-debito').classList.toggle('active',tipo==='debito');
+}
+function addCustomTarjeta(){
+  const pg=document.getElementById('new-card-pg').value;
+  const nombre=(document.getElementById('new-card-nombre').value||'').trim();
+  if(!nombre){document.getElementById('new-card-nombre').focus();return;}
+  if(!state.tarjetasCustom)state.tarjetasCustom={ang:[],jor:[]};
+  if(!state.tarjetasCustom[pg])state.tarjetasCustom[pg]=[];
+  const allExist=allTarjetasList(pg).map(n=>n.toLowerCase());
+  if(allExist.includes(nombre.toLowerCase())){
+    alert('Ya existe una tarjeta con ese nombre para este titular.');return;
+  }
+  state.tarjetasCustom[pg].push({id:nTar++,nombre,tipo:_newCardType});
+  document.getElementById('new-card-nombre').value='';
+  renderAdminTab();
+  // Actualizar selects de tarjeta en el formulario de captura
+  const pg2=document.getElementById('cap-pagador');
+  if(pg2)updateCapTarjeta(pg2.value||'ang');
+  saveState();
+}
+function deleteCustomTarjeta(pg,id){
+  if(!state.tarjetasCustom||!state.tarjetasCustom[pg])return;
+  const tar=state.tarjetasCustom[pg].find(c=>c.id===id);
+  if(tar){
+    // Limpiar config de fechas si existía
+    const k=tarjetaKey(pg,tar.nombre);
+    delete state.tarjetasConfig[k];
+  }
+  state.tarjetasCustom[pg]=state.tarjetasCustom[pg].filter(c=>c.id!==id);
+  renderAdminTab();
+  const pg2=document.getElementById('cap-pagador');
+  if(pg2)updateCapTarjeta(pg2.value||'ang');
   saveState();
 }
 
